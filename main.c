@@ -6,7 +6,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#define TAM (1<<20)
+#define max (1<<20)
 
 struct s_regs{
     int32_t r[16];
@@ -18,8 +18,8 @@ struct s_regs{
 };
 
 struct s_regs regs;
-int isBench = 0;
-void decodificar( uint8_t *mem) {
+int bbench = 0;
+void traduz( uint8_t *mem) {
     u_int16_t op = regs.ir >> 26;
     u_int8_t rs,rt;
     rs = (regs.ir<<6)>>27;
@@ -40,30 +40,30 @@ void decodificar( uint8_t *mem) {
             case 4://beq
                 if(regs.r[rs] == regs.r[rt]) {
                     regs.pc += imed << 2;
-                    isBench = 1;
+                    bbench = 1;
                 }
                 break;
             case 1://bgez
                 if(regs.r[rs] >= 0) {
                     regs.pc += imed << 2;
-                    isBench = 1;
+                    bbench = 1;
                 }
                 break;
             case 7://bgtz
                 if(regs.r[rs] > 0) {
                     regs.pc += imed << 2;
-                    isBench = 1;
+                    bbench = 1;
                 }
                 break;
             case 5://bne
                 if(regs.r[rs] != regs.r[rt]) {
                     regs.pc += imed << 2;
-                    isBench = 1;
+                    bbench = 1;
                 }
                 break;
             case 2://jump
                 regs.pc= (regs.pc & 0xf0000000) | (endereco << 2);
-                isBench = 1;
+                bbench = 1;
                 break;
             case 32://lb
                 regs.r[rt] = mem[regs.r[rs] + imed];
@@ -130,7 +130,7 @@ void decodificar( uint8_t *mem) {
 }
 
 int main(int argc, char** argv) {
-    uint8_t MEMORY[TAM];
+    uint8_t mem[max];
     FILE *fw, *fr;
 
     if(argc==2){
@@ -144,31 +144,31 @@ int main(int argc, char** argv) {
     }
     struct stat data;
 
-    memset(MEMORY,0, sizeof(uint8_t)*TAM);
+    memset(mem, 0, sizeof(uint8_t)*max);
     memset(&regs, 0, sizeof (struct s_regs));
-    regs.limit = (TAM) - 1;
+    regs.limit = (max) - 1;
 
     fstat(fileno(fr), &data);
     off_t size = data.st_size;
-    fread(MEMORY,size,1,fr);
+    fread(mem,size,1,fr);
 
     fclose(fr);
 
-    regs.ir = *((uint32_t*) (MEMORY + regs.pc));
+    regs.ir = *((uint32_t*) (mem + regs.pc));
 
     while(regs.ir != 0){
-        decodificar(MEMORY);
-        if(isBench == 0)regs.pc+=4;
-        else isBench = 0;
-        regs.ir = *((uint32_t*) (MEMORY + regs.pc));
+        traduz(mem);
+        if(bbench == 0)regs.pc+=4;
+        else bbench = 0;
+        regs.ir = *((uint32_t*) (mem + regs.pc));
     }
     fw=fopen("sim.out","w");
 
     fwrite(&regs, sizeof(struct s_regs), 1, fw);
     uint32_t soma = 0;
 
-    for(int i =0;i<TAM/4;i+=4){
-        soma += *((uint32_t *)(MEMORY+i));
+    for(int i =0;i<max/4;i+=4){
+        soma += *((uint32_t *)(mem+i));
     }
     fwrite(&soma,sizeof (int),1,fw);
     
